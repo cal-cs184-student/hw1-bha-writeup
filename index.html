@@ -23,90 +23,353 @@
 			body {
 				font-family: 'Inter', sans-serif;
 			}
+
+			table {
+				width: 100%;
+				text-align: center;
+				border-collapse: collapse;
+			}
+
+			td {
+				text-align: center;
+				padding: 8px;
+			}
 		</style>
 	</head>
 	<body>
 		<div class="container">
 		<h1>CS184/284A Fall 2026 Homework 1 Write-Up</h1>
-		<div style="text-align: center;">Names: </div>
+		<div style="text-align: center;">Names: Bharagth Ravindhran</div>
 
 		<br>
 
 		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-		
+
 		<br>
 
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-
-		<figure>
-			<img src="assets/lion.jpg" alt="Lion" style="width:50%"/>
-			<figcaption>You can add images with captions!</figcaption>
-		</figure>
-
-		<!--
-		We've already added one heading per task, to make your write-up as navigable when grading. Please fit your write-up within these sections!
-		-->
+		Link to GitHub repository: (TODO) <a href="https://github.com/cal-cs184-student/hw1-bha">https://github.com/cal-cs184-student/hw1-bha</a>
 
 		<h2>Overview</h2>
-		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+
+		<h3>What I built</h3>
+		<ul>
+			<li>I built a vector graphics renderer that turns simplified SVG files into raster images. It drew single-color triangles, antialiased them with supersampling, placed drawings with hierarchical transforms, and mapped textures with pixel and mipmap level sampling.</li>
+			<li>The pipeline flowed from <code>SVGParser</code> to <code>SVGElement</code> scaled draws to my <code>RasterizerImp</code> functions in <code>src/rasterizer.cpp</code>, with transforms in <code>src/transforms.cpp</code> and texture sampling in <code>src/texture.cpp</code>.</li>
+		</ul>
+
+		<h3>My approach per task</h3>
+		<ul>
+			<li>Task 1: I rasterized triangles by testing pixel centers against three edge functions inside a clamped bounding box, with winding normalization and the top-left edge rule.</li>
+			<li>Task 2: I widened the sample buffer to hold a grid of subsamples per pixel and resolved them by averaging, keeping points and lines solid through <code>fill_pixel</code>.</li>
+			<li>Task 3: I implemented translate, scale, and counterclockwise rotate as 3x3 homogeneous matrices, then posed cubeman as Superman purely by editing transform attributes.</li>
+			<li>Task 4: I computed barycentric weights from the same edge functions and blended vertex colors per subsample.</li>
+			<li>Task 5: I interpolated texture coordinates with barycentrics and reconstructed texels with nearest or bilinear sampling at full resolution.</li>
+			<li>Task 6: I measured each pixel's texture footprint with uv differentials and selected or blended mipmap levels with nearest or linear filtering.</li>
+		</ul>
+
+		<h3>Problems and fixes</h3>
+		<ul>
+			<li>Task 4: a dashed white line appeared along one color-wheel spoke at rate 1. I traced it to float rounding flipping shared-edge ownership and added a small epsilon (<code>edge_eps = 0.005</code>) that snaps near-zero edge values into the top-left tie-break, picked as the smallest value clearing the artifact.</li>
+			<li>Task 5: texmap renders differed from references on high-frequency detail. I measured local texture variance and confirmed differing pixels sit on 10x higher variance detail, which is inherent minification noise between implementations rather than a convention bug, and unit tests on known textures all passed.</li>
+			<li>Task 6: the starter <code>generate_mips</code> leaves its smallest level unfilled. Since it sits outside the task modify list and that level was unreachable in practice, I left it alone.</li>
+			<li>General: the starter <code>texture.cpp</code> missed <code>#include &lt;cstdint&gt;</code> for its <code>uint8_t</code> helpers and failed to compile on my toolchain, so I added that single include.</li>
+		</ul>
+
+		<h3>What I learned</h3>
+		<ul>
+			<li>Everything in this homework boiled down to sampling, meaning the renderer never saw continuous geometry directly and only ever evaluated it at discrete points. Triangles tested pixel centers, supersampling averaged grids of subsamples per pixel, barycentrics weighted the three corners at each sample, and mipmaps matched each pixel to the prefiltered texture level covering its footprint.</li>
+			<li>I was surprised that changing such small values could produce such a large change in output. For example, the edge tolerance defines a tie-break band around each triangle edge, so setting it to 0.005 decided whether boundary samples counted as covered. Likewise, level selection computes a continuous value but must round to a discrete pyramid level, and each level step halves or doubles the texture resolution. I checked each such choice against references, since a constant I could easily overlook ended up redrawing visible regions of the image.</li>
+			<li>Documenting my work allowed me to understand the concepts better. Explaining the magenta gap meant comparing the triangle width against the sample spacing, where a sample spacing wider than the triangle leaves whole rows of pixel centers outside all three edge tests. Stating those two numbers made the dropout mechanism obvious.</li>
+		</ul>
 
 		<h2>Task 1: Drawing Single-Color Triangles</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
-		<div style="display: flex; flex-direction: column; align-items: center;">
-			<table style="width: 100%; text-align: center; border-collapse: collapse;">
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/lion.jpg" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			</table>
-		</div>
-		
+		<h3>How I rasterize triangles</h3>
+		<ul>
+			<li>The work happened in <code>RasterizerImp::rasterize_triangle()</code> in <code>src/rasterizer.cpp</code>.</li>
+			<li>Following Lecture 2, I treated rasterization as sampling a 2D indicator function <code>f(x,y) = inside(tri,x,y)</code>, so each output pixel was <code>Image[x][y] = f(x + 0.5, y + 0.5)</code>. That meant I tested pixel centers, never corners.</li>
+			<li>The point in triangle test was three line tests. A sample was inside only when it passed all three edge functions, that is <code>L0 &gt; 0 &amp;&amp; L1 &gt; 0 &amp;&amp; L2 &gt; 0</code>.</li>
+			<li>I normalized the winding order first. I computed the signed area and swapped vertices when the triangle was clockwise, so the same test worked for clockwise and counterclockwise input. I checked this with <code>svg/basic/test6.svg</code>.</li>
+			<li>I computed the bounding box of the triangle and clamped it to the framebuffer size.</li>
+			<li>For each pixel in that box, I evaluated the three edge functions at the pixel center.</li>
+			<li>As the lecture notes, the real test needs boundary handling based on edge rules. I used the encouraged OpenGL and Direct3D rule, where a sample exactly on an edge counts as covered when the edge is a top edge or a left edge. A top edge is horizontal and above the triangle. A left edge is not horizontal and sits on the left side of the triangle.</li>
+			<li>When a sample passed, I called the <code>fill_pixel()</code> helper once. This task used one sample per pixel, and supersampling came later in Task 2.</li>
+		</ul>
+
+		<h3>Bounding box efficiency</h3>
+		<ul>
+			<li>The bounding box is the smallest rectangle that contains the whole triangle.</li>
+			<li>My loops visited exactly the pixels in that clamped box, which was <code>(xmax - xmin + 1)</code> by <code>(ymax - ymin + 1)</code> samples.</li>
+			<li>I never tested pixels outside the box, and I never scanned the full framebuffer.</li>
+			<li>The work per sample is constant, just three edge function evaluations plus the edge rule checks.</li>
+			<li>So the running time grows with the bounding box area, which matches a baseline that checks each sample in the box.</li>
+		</ul>
+
+		<h3>Screenshot</h3>
+		<ul>
+			<li>Figure 1 shows <code>basic/test4.svg</code> with default viewing parameters, pixel inspector centered on the thin magenta sliver at the right edge, captured with the <code>S</code> hotkey.</li>
+			<li>The zoom window showed the sliver covering only one to two pixels wide, so individual pixel center decisions were visible. The main view also showed the thin red sliver and the solid blue, green, and yellow triangles rendered correctly.</li>
+			<li>This region was interesting because the magenta sliver had a visible gap. The triangle was only about 0.2 SVG units wide near the top and widened toward the bottom, so the narrow part was thinner than the spacing between pixel centers. With one center sample per pixel, whole rows of pixel centers fell outside the three edge tests and stayed white. The reference render showed the same gap, so this was expected single sampling dropout and not a bug.</li>
+		</ul>
+
+		<figure>
+			<img src="assets/task1_test4_magenta.png" alt="Figure 1: test4 with pixel inspector on the magenta sliver" style="width:80%"/>
+			<figcaption>Figure 1: test4 with pixel inspector on the magenta sliver</figcaption>
+		</figure>
+
+		<h3>Extra credit</h3>
+		<ul>
+			<li>I sped up <code>rasterize_triangle()</code> by stepping edge values forward with addition instead of recomputing them per sample, since each edge changes by a fixed amount per pixel. I used double precision for the running values so rounding drift stays far below the edge tolerance, and I moved the buffer index math out of the inner loops.</li>
+			<li>I timed <code>svg.draw()</code> over 20 runs at 1024x1024, rate 1, basic vs optimized:</li>
+		</ul>
+
+		<table>
+			<tr><th>scene</th><th>basic (us)</th><th>optimized (us)</th><th>speedup</th></tr>
+			<tr><td>test3</td><td>16018.8</td><td>9459.8</td><td>1.7x</td></tr>
+			<tr><td>test4</td><td>966.8</td><td>442.4</td><td>2.2x</td></tr>
+			<tr><td>test6</td><td>1725.3</td><td>848.8</td><td>2.0x</td></tr>
+		</table>
+
+		<ul>
+			<li>Output stayed byte identical to the references on test3 through test6 and robot, so the speedup cost no correctness.</li>
+		</ul>
+
 		<h2>Task 2: Antialiasing by Supersampling</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+		<h3>Algorithm and data structures</h3>
+		<ul>
+			<li>I stored one color per subsample in <code>sample_buffer</code>, sized <code>width * height * sample_rate</code> and indexed as <code>sample_buffer[(y * width + x) * sample_rate + k]</code>.</li>
+			<li>I arranged the subsamples as a grid of <code>sqrt(rate)</code> by <code>sqrt(rate)</code> spread evenly over each pixel, at positions <code>x + (i + 0.5) / n</code> and <code>y + (j + 0.5) / n</code>.</li>
+			<li>I kept the Task 1 bounding box, winding normalization, and top-left edge rule in <code>rasterize_triangle()</code>, and I tested every subsample against the three edge functions, writing only the covered ones.</li>
+		</ul>
+
+		<h3>Why supersampling helps</h3>
+		<ul>
+			<li>A single center sample made edge pixels all or nothing, which caused jaggies and made skinny geometry like the magenta sliver drop out completely.</li>
+			<li>With several samples per pixel, an edge pixel got a mix of covered and uncovered subsamples, so the resolved color was a blend. Edges looked smoother and thin triangles survived instead of vanishing.</li>
+		</ul>
+
+		<h3>Pipeline changes</h3>
+		<ul>
+			<li>I updated <code>set_sample_rate()</code> and <code>set_framebuffer_target()</code> in <code>src/rasterizer.cpp</code> to resize the buffer to <code>width * height * sample_rate</code>, so it stayed correct when the rate changed with the <code>-</code> and <code>=</code> keys and when the window was resized.</li>
+			<li>I cleared the whole supersample buffer to white in <code>clear_buffers()</code> before each redraw.</li>
+			<li>I changed <code>fill_pixel()</code> to write the same color to all subsamples of a pixel, which kept points and lines working, for example the black border in <code>test4.svg</code>, without needing their own antialiasing.</li>
+			<li>I averaged the subsamples of each pixel in <code>resolve_to_framebuffer()</code> and converted the float color to 8-bit RGB for the display.</li>
+		</ul>
+
+		<h3>Antialiasing my triangles</h3>
+		<ul>
+			<li>Covered subsamples got the triangle color and uncovered ones stayed white, then the average became the pixel color. A pixel that was half covered rendered as half blend, so staircase edges turned into smooth ramps.</li>
+		</ul>
+
+		<h3>Screenshots</h3>
+		<ul>
+			<li>Figures 2 through 4 show <code>basic/test4.svg</code> with default viewing parameters at rates 1, 4, and 16. The pixel inspector sat over the very skinny magenta sliver corner, and I captured each with the <code>S</code> hotkey.</li>
+			<li>At rate 1 the sliver showed a hard gap where whole pixel centers missed the triangle. At rates 4 and 16 the gap filled in with blended pink pixels. This was observed because partially covered pixels then averaged their covered and uncovered subsamples instead of dropping out completely.</li>
+		</ul>
+
+		<table>
+			<tr>
+				<td>
+					<img src="assets/task2_test4_rate1.png" width="100%"/>
+					<figcaption>Figure 2: test4 at sample rate 1</figcaption>
+				</td>
+				<td>
+					<img src="assets/task2_test4_rate4.png" width="100%"/>
+					<figcaption>Figure 3: test4 at sample rate 4</figcaption>
+				</td>
+				<td>
+					<img src="assets/task2_test4_rate16.png" width="100%"/>
+					<figcaption>Figure 4: test4 at sample rate 16</figcaption>
+				</td>
+			</tr>
+		</table>
+
+		<h3>Extra credit</h3>
+		<ul>
+			<li>Not attempted.</li>
+		</ul>
 
 		<h2>Task 3: Transforms</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+		<h3>Implementation</h3>
+		<ul>
+			<li>I filled in <code>translate(dx, dy)</code>, <code>scale(sx, sy)</code>, and <code>rotate(deg)</code> in <code>src/transforms.cpp</code> following the SVG spec. Each returned a 3x3 matrix in homogeneous coordinates, matching the 9-argument row-major <code>Matrix3x3</code> constructor.</li>
+			<li><code>translate(dx, dy)</code> returned rows <code>[1 0 dx]</code>, <code>[0 1 dy]</code>, <code>[0 0 1]</code>.</li>
+			<li><code>scale(sx, sy)</code> returned rows <code>[sx 0 0]</code>, <code>[0 sy 0]</code>, <code>[0 0 1]</code>.</li>
+			<li><code>rotate(deg)</code> converted degrees counterclockwise to radians and returned rows <code>[cos -sin 0]</code>, <code>[sin cos 0]</code>, <code>[0 0 1]</code>.</li>
+			<li>These composed through the hierarchical <code>transform</code> stack in <code>svg.cpp</code>, so nested <code>&lt;g transform="..."&gt;</code> groups like the ones in <code>robot.svg</code> placed the torso, head, arms, and legs correctly.</li>
+		</ul>
+
+		<h3>My robot</h3>
+		<ul>
+			<li>I posed cubeman flying like Superman to the right in <code>svg/transforms/my_robot.svg</code> (saved as <code>my_robot.svg</code> in this repository), starting from an exact copy of <code>robot.svg</code>.</li>
+			<li>I added no shapes and changed no colors. Only transform attributes changed.</li>
+			<li>I tilted the whole figure slightly nose up with an outer <code>rotate(-8)</code>.</li>
+			<li>I moved the head from above the torso to the front with <code>translate(95 -15)</code> so it led the flight next to the punching arm.</li>
+			<li>I swung both legs back to trail behind with <code>translate(-70 20) rotate(85)</code> and <code>translate(-70 -20) rotate(95)</code>, giving a slight split kick.</li>
+			<li>I kept the right arm exactly as it was, since it already punched forward, and I brought the left arm forward to match with <code>translate(80 25)</code>, flipping its forearm from <code>translate(-70 0)</code> to <code>translate(70 0)</code> so both fists punched ahead side by side.</li>
+		</ul>
+
+		<figure>
+			<img src="assets/task3_my_robot.png" alt="Figure 5: my robot flying like Superman" style="width:80%"/>
+			<figcaption>Figure 5: my robot flying like Superman</figcaption>
+		</figure>
+
+		<h3>Extra credit</h3>
+		<ul>
+			<li>I added a mirror toggle in <code>src/drawrend.cpp</code> on the <code>M</code> key, cycling off, mirror-X, mirror-Y, and mirror-X+Y, with the mode shown in the on-screen status line.</li>
+			<li>The mirrors compose directly into the NDC-to-screen matrix in <code>resize()</code>: mirror-X negates the x scale entry and re-anchors its offset about the image center, mirror-Y does the same to the y entries, and mirror-X+Y does both. The per-tab SVG-to-NDC view matrices are untouched, so pan, zoom, and reset keep working and the mirror applies on top of any view.</li>
+			<li>Figures 6 through 8 show <code>my_robot.svg</code> captured with the <code>S</code> hotkey, one per mirror mode. I verified each against the base render: the red bounding boxes flip exactly about the image center on the mirrored axes.</li>
+		</ul>
+
+		<table>
+			<tr>
+				<td>
+					<img src="assets/task3_mirror_x.png" width="100%"/>
+					<figcaption>Figure 6: mirrored robot, mirror-X mode</figcaption>
+				</td>
+				<td>
+					<img src="assets/task3_mirror_y.png" width="100%"/>
+					<figcaption>Figure 7: mirrored robot, mirror-Y mode</figcaption>
+				</td>
+				<td>
+					<img src="assets/task3_mirror_xy.png" width="100%"/>
+					<figcaption>Figure 8: mirrored robot, mirror-X+Y mode</figcaption>
+				</td>
+			</tr>
+		</table>
 
 		<h2>Task 4: Barycentric coordinates</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+		<h3>Barycentric coordinates</h3>
+		<ul>
+			<li>Barycentric coordinates describe a point inside a triangle as a mix of the three corners. I computed three weights called alpha, beta, and gamma, one per vertex, that always add up to 1.</li>
+			<li>Each weight equals the area of the small triangle formed by the sample point and the opposite edge, divided by the area of the whole triangle. I got both areas from the same edge functions I already used for the inside test, so if alpha was the weight for corner 0, it was the edge value of edge 1-2 at the sample divided by that edge value at corner 0.</li>
+			<li>A weight of 1 means the sample sits exactly on that corner, and equal thirds means it sits at the center. Anything outside the triangle gives a negative weight, which is another way to run the inside test.</li>
+			<li>I filled in <code>rasterize_interpolated_color_triangle()</code> in <code>src/rasterizer.cpp</code> by reusing my Task 1 and 2 traversal. That gave me winding normalization with matching color swaps, a clamped bounding box, the top-left edge rule, and the <code>sqrt(rate)</code> by <code>sqrt(rate)</code> supersample grid. I skipped zero area triangles to avoid dividing by zero.</li>
+			<li>For each covered subsample I computed alpha, beta, and gamma as above and set the color to <code>alpha * c0 + beta * c1 + gamma * c2</code>. Since each subsample got its own blended color, the resolve step averaged them with no extra work.</li>
+		</ul>
+
+		<h3>Screenshot</h3>
+		<ul>
+			<li>Figure 9 shows <code>svg/basic/test7.svg</code> with default viewing parameters and sample rate 1, captured with the <code>S</code> hotkey. The wheel blended smoothly with no gaps along the spokes.</li>
+		</ul>
+
+		<figure>
+			<img src="assets/task4_test7.png" alt="Figure 9: test7 color wheel at sample rate 1" style="width:80%"/>
+			<figcaption>Figure 9: test7 color wheel at sample rate 1</figcaption>
+		</figure>
 
 		<h2>Task 5: "Pixel sampling" for texture mapping</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+		<h3>Pixel sampling</h3>
+		<ul>
+			<li>When I mapped a texture onto a triangle, each screen sample got a texture coordinate (u, v) from barycentric interpolation. Since that coordinate almost never landed exactly on a texel center (a texel is just one pixel of the texture image), I had to reconstruct a single color from the surrounding texels, and that choice is what pixel sampling was about.</li>
+			<li>With nearest sampling I simply returned the closest texel. It cost one texel fetch and kept things sharp, but when the texture was minified it aliased, because neighboring samples could land on completely unrelated texels.</li>
+			<li>With bilinear sampling I blended the four surrounding texels instead, interpolating horizontally first and then vertically. It cost four fetches, but the reconstruction was continuous, so the minification aliasing largely went away.</li>
+			<li>For <code>Texture::sample_nearest()</code> in <code>src/texture.cpp</code>, I converted with <code>tx = floor(u * w)</code> and <code>ty = floor(v * h)</code>, clamped into range, and returned that texel.</li>
+			<li>For <code>Texture::sample_bilinear()</code> in <code>src/texture.cpp</code>, I located the sample at <code>x = u * w - 0.5</code> and <code>y = v * h - 0.5</code> in texel-center space, took the four neighbors with clamped indices, blended horizontally with the fractional part, then blended those two results vertically.</li>
+			<li>I filled in <code>rasterize_textured_triangle()</code> in <code>src/rasterizer.cpp</code> by reusing my Task 1, 2, and 4 traversal. That gave me winding normalization with matching uv swaps, a clamped bounding box, the top-left edge rule with epsilon, and the supersample grid. For each covered subsample I interpolated the uv with barycentrics and called nearest or bilinear based on <code>psm</code>, always at mipmap level 0 for now.</li>
+		</ul>
+
+		<h3>Screenshots</h3>
+		<ul>
+			<li>Figures 10 through 13 show <code>svg/texmap/test1.svg</code> with default viewing parameters, all captured with the <code>S</code> hotkey and the pixel inspector over the West Africa coastline.</li>
+			<li>Nearest at 1 sample per pixel showed chunky texels with visible steps along the coast. Nearest at 16 kept that texel chunkiness but smoothed out the triangle coverage edges around it through supersampling.</li>
+			<li>Bilinear at 1 already blended the texels into smooth gradients, a clear step up from nearest at 1. Bilinear at 16 combined texture filtering with coverage antialiasing, so it looked the cleanest overall.</li>
+			<li>The methods diverged most on magnified high-frequency detail like this coastline, where one screen pixel spanned several texels. Nearest committed to a single texel, bilinear filtered four, and supersampling integrated whole-pixel coverage. On uniform regions like the open ocean, all four looked the same.</li>
+		</ul>
+
+		<table>
+			<tr>
+				<td>
+					<img src="assets/task5_nearest_1spp.png" width="100%"/>
+					<figcaption>Figure 10: nearest at 1 sample per pixel</figcaption>
+				</td>
+				<td>
+					<img src="assets/task5_nearest_16spp.png" width="100%"/>
+					<figcaption>Figure 11: nearest at 16 samples per pixel</figcaption>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<img src="assets/task5_bilinear_1spp.png" width="100%"/>
+					<figcaption>Figure 12: bilinear at 1 sample per pixel</figcaption>
+				</td>
+				<td>
+					<img src="assets/task5_bilinear_16spp.png" width="100%"/>
+					<figcaption>Figure 13: bilinear at 16 samples per pixel</figcaption>
+				</td>
+			</tr>
+		</table>
 
 		<h2>Task 6: "Level Sampling" with mipmaps for texture mapping</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-		<h2>(Optional) Task 7: Extra Credit - Draw Something Creative!</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-		<h2>Additional Notes (please remove)</h2>
+		<h3>Level sampling</h3>
 		<ul>
-			<li>You can also add code if you'd like as so: <code>code code code</code></li>
-			<li>If you'd like to add math equations, 
-				<ul>
-					<li>You can write inline equations like so: \( a^2 + b^2 = c^2 \)</li>
-					<li>You can write display equations like so: \[ a^2 + b^2 = c^2 \]</li>
-				</ul>
-			</li>
+			<li>Pixel sampling picked texels from one image, but when a triangle was minified, one screen pixel could cover hundreds of texels, and no single-level filter stayed stable. Mipmapping prebuilt a pyramid of downsampled textures, and level sampling picked which pyramid level matched the on-screen footprint of each pixel.</li>
+			<li>I measured the footprint with uv differentials, which track how much the texture coordinate moved when I stepped one pixel right (<code>p_dx_uv - p_uv</code>) and one pixel down (<code>p_dy_uv - p_uv</code>), scaled up by the full texture size into texels. The mipmap level was <code>log2</code> of the longer of those two steps, so a pixel spanning 4 texels sampled from 2 levels down.</li>
+			<li>I computed the uv at the sample plus the uv at its +1x and +1y neighbors with barycentrics, which gave the differentials their correct perspective behavior across the triangle for free.</li>
+			<li>For <code>Texture::get_level()</code> in <code>src/texture.cpp</code>, I differenced the <code>SampleParams</code> uvs, scaled by the full resolution width and height, took the longer Euclidean length, and returned <code>log2</code> of it clamped to the available levels.</li>
+			<li>For <code>Texture::sample()</code> in <code>src/texture.cpp</code>, <code>L_ZERO</code> sampled level 0 as in Task 5, <code>L_NEAREST</code> rounded the level and sampled it, and <code>L_LINEAR</code> blended the two adjacent levels by the fractional part. Each level fetch honored <code>psm</code>, so linear pixel sampling on linear level sampling gave trilinear filtering. All level indices clamped into the pyramid.</li>
+			<li>I extended <code>rasterize_textured_triangle()</code> in <code>src/rasterizer.cpp</code> to fill the full <code>SampleParams</code> per covered subsample. That meant <code>p_uv</code> at the subsample plus <code>p_dx_uv</code> and <code>p_dy_uv</code> from barycentrics evaluated one pixel over in x and y. I skipped the extra evaluations in <code>L_ZERO</code> mode and called <code>tex.sample(sp)</code> for every subsample.</li>
 		</ul>
+
+		<h3>Tradeoffs</h3>
+		<ul>
+			<li>Supersampling brute-forced every edge by shading multiple samples per pixel. It antialiased geometry coverage but multiplied shading cost and sample memory by the rate, and it did nothing for texture detail inside a fully covered pixel.</li>
+			<li>Pixel sampling (nearest vs bilinear) was cheap in memory with no extra storage, and bilinear smoothed magnified texels nicely, but neither helped minification, since one pixel still committed to one texel neighborhood while its footprint covered many.</li>
+			<li>Level sampling added about a third more texture memory for the pyramid, and each fetch stayed constant cost (one or two level reads). It was the only one of the three that stayed stable under heavy minification, trading a controlled amount of blur for the shimmer it removed.</li>
+		</ul>
+
+		<h3>Screenshots</h3>
+		<ul>
+			<li>I copied <code>svg/texmap/test1.svg</code> to <code>svg/texmap/my_tex.svg</code> and repointed its texture to the grid test pattern at <code>img/grid.png</code>, since regular grids moired dramatically under minification.</li>
+			<li>Figures 14 through 17 show that scene with default viewing parameters, all captured with the <code>S</code> hotkey at sample rate 1 with the pixel inspector over a grid crossing.</li>
+			<li>The inspector spot sat on the front face where minification was mild, so the level selector picked level 0 and the <code>L_ZERO</code> and <code>L_NEAREST</code> inspector views matched. That itself showed level selection at work, since mipmaps only kicked in where the footprint demanded it. The <code>P</code> difference was dramatic there instead, with nearest showing hard black and white steps while bilinear blended smooth gray ramps.</li>
+			<li>The <code>L</code> difference lived in the main view at the limbs and poles, where the <code>L_ZERO</code> limbs broke into speckle while the <code>L_NEAREST</code> limbs kept clean grid lines deeper into the minified zone.</li>
+		</ul>
+
+		<table>
+			<tr>
+				<td>
+					<img src="assets/task6_lzero_nearest.png" width="100%"/>
+					<figcaption>Figure 14: level zero with nearest pixel sampling</figcaption>
+				</td>
+				<td>
+					<img src="assets/task6_lzero_bilinear.png" width="100%"/>
+					<figcaption>Figure 15: level zero with bilinear pixel sampling</figcaption>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<img src="assets/task6_lnearest_nearest.png" width="100%"/>
+					<figcaption>Figure 16: nearest level with nearest pixel sampling</figcaption>
+				</td>
+				<td>
+					<img src="assets/task6_lnearest_bilinear.png" width="100%"/>
+					<figcaption>Figure 17: nearest level with bilinear pixel sampling</figcaption>
+				</td>
+			</tr>
+		</table>
+
+		<h3>Extra credit</h3>
+		<ul>
+			<li>Not attempted.</li>
+		</ul>
+
+		<h2>Competition entry</h2>
+		<ul>
+			<li>I generated an original café wall optical illusion with <code>src/make_cafe_wall.py</code>, a short Python script that emits 133 axis-aligned <code>&lt;rect&gt;</code> elements: alternating black and white bricks offset by half a brick each row with gray mortar lines between rows. No curves or paths, only rectangles.</li>
+			<li>I called it No Curves, since the rasterizer cannot display SVG path elements, I wanted to see how much curvature I could fake with nothing but straight lines. I rendered it at 800x800 with my own rasterizer and captured Figure 18 below. Every mortar line is perfectly horizontal; the apparent tilt lives entirely in the contrast between the offset bricks and the mortar.</li>
+		</ul>
+
+		<figure>
+			<img src="assets/competition_cafe_wall.png" alt="Figure 18: No Curves" style="width:80%"/>
+			<figcaption>Figure 18: No Curves</figcaption>
+		</figure>
+
 		</div>
 	</body>
 </html>
